@@ -97,6 +97,7 @@ onMounted(() => {
       uniform float seed;
       uniform float flowSpeed;
       uniform float flowStrength;
+
       void main() {
         vUv = uv;
         // 基于高度 vUv.y 计算外扩位移（更细更尖）
@@ -200,7 +201,7 @@ onMounted(() => {
             // 将 periphery 根据椭圆掩膜调制，使红色更多出现在椭圆外侧
             periphery *= ellipseMask;
             periphery = clamp(periphery, 0.0, 1.0);
-            // 增强外围红色混合权重
+            // 增强外围红色混合权重比例
             float peripheryShift = smoothstep(0.5, 1.0, heightFactor); 
             color = mix(color, flameColor2, periphery * 1.7 *peripheryShift);
             // 内部过渡收缩效果：在椭圆内部加强中间过渡颜色（偏向底色），使其呈椭圆形
