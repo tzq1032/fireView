@@ -111,7 +111,7 @@ onMounted(() => {
         // 计算沿本地 X 轴（圆柱轴）的喷射位移：将本地 X 轴变换到世界空间
         vec3 axisWorld = normalize(mat3(modelMatrix) * vec3(1.0, 0.0, 0.0));
         // 基于噪声和高度产生沿轴方向的流动（喷射）
-        float flowNoise = noise(vec2(vUv.x * 3.0 + seed * 0.2, vUv.y * 8.0 - time * flowSpeed + seed * 1.0));
+        float flowNoise = noise(vec2(vUv.x * 3.0 + seed * 0.2, vUv.y * 8.0 - time * flowSpeed + seed * 1.0))*0.5;
         //pow函数用来进行幂运算 例：float a = pow(2.0, 3.0); 结果是 8.0
         float axial = pow(h, 1.6) * flowNoise * flowStrength ;
         // 计算世界空间的径向方向（来自原点到顶点的方向，忽略 y）
@@ -123,12 +123,13 @@ onMounted(() => {
         side = side * 0.5 + 0.6; // 归一到 0..1（0 内侧，1 外侧）
         // 允许用 sideFlip 翻转内外侧
         side = mix(side, 1.0 - side, sideFlip);
-        // 根据侧面权重放大/缩小位移，限制外侧扩散使火焰更纤细
+        // 根据侧面权重放大/缩小位移，限制外侧扩散使火焰更纤细，
         float sideFactor = mix(0.05, 0.2, side);
         // 传递给片段着色器，用于在外围混合底部颜色
         vSide = sideFactor ;
         float s = 0.8;
         // 轴向取反，使喷射方向翻转
+        // position + 法线位移 - 轴向位移 （axisWorld：x轴方向，火焰喷射方向）
         vec3 displaced = position + normal * disp * s * sideFactor - axisWorld * axial;
         gl_Position = projectionMatrix * modelViewMatrix * vec4( displaced, 1.0);
       }
@@ -160,11 +161,8 @@ onMounted(() => {
             float heightFactor = vUv.y;
             // 基于轴向和环向的噪声，制造上下抖动和向外喷射的形状
             float n = 0.0;
-            // 噪声频率适度增高以匹配更长的几何体
-            // n += 1.6 * noise(vec2(vUv.x * 4.0, vUv.y * 10.0 - time * 3.0));//调大 可以消除火星
-            // n += 0.3 * noise(vec2(vUv.x * 8.0, vUv.y * 18.0 - time * 6.0));
             // 降低高频噪声贡献，避免底部和外围出现过多小颗粒
-            n += 1.5 * noise(vec2(vUv.x * 12.0, vUv.y * 30.0 - time * 10.0));
+            n += 1.5 * noise(vec2(vUv.x * 12.0, vUv.y * 10.0 - time * 10.0));
             n = clamp(n, 0.0, 1.0);
             // 喷口发射强度：底部（heightFactor ~ 0）有发射源，整体强度调小以减少亮白区域
             // 降低 emitter 基数以减少白色高光整体存在
@@ -173,13 +171,13 @@ onMounted(() => {
             float axialFlow = noise(vec2(vUv.x * 3.0 + seed * 0.7, vUv.y * 10.0 - time * flowSpeed + seed * 0.5));
             axialFlow = clamp(axialFlow, 0.0, 1.0);
             // 让火焰随高度衰减并向外张开（主体）
-            float shape = pow(1.0 - heightFactor, 10.5);
+            float shape = pow(heightFactor , 0.01);
             float intensity = smoothstep(0.15, 0.0, heightFactor - n * 0.8) * shape;
             intensity = clamp(intensity , 0.0, 1.0);
             // 将底部发射与轴向流结合进最终强度，系数调小以避免过度高亮
             intensity = max(intensity, emitter * (0.5 + 0.6 * axialFlow));
             // 颜色渐变：底部偏黄，顶部偏红
-            vec3 baseColor = mix(flameColor1, flameColor2, pow(heightFactor, 1.6));
+            vec3 baseColor = mix(flameColor1, flameColor2, pow(heightFactor, 0.0));
             // 根据 emitter 强度在出火口附近混合成高亮（减少白色元素）
             float whiteMix = clamp(emitter, 0.0, 1.0);
             // 进一步收窄高光区域并显著降低其强度
@@ -189,7 +187,7 @@ onMounted(() => {
             vec3 color = mix(baseColor, highlightColor, whiteMix * 0.28);
             // 在火焰外围（侧面）加入与底部相同的颜色以增强边缘色彩
             // vSide 越大表示外侧越明显；heightFactor 用于让这种效果更偏向底部
-            // 扩大外围影响并偏向红色（flameColor2），让外围红色更多一些
+            // 扩大外围影响并偏向红色（flameColor2）让外围红色更多一些
             // 扩大外围影响并增强偏红效果
             // 扩大外围红色火焰范围和强度
             float periphery = smoothstep(0.08, 0.85, vSide) * (1.0 - clamp(heightFactor * 0.95, 0.0, 1.0));
@@ -262,7 +260,6 @@ onMounted(() => {
     let x = 0
     if (i === 0) x = -0.25
     if (i === 1) x = 0.25
-
     nozzle.scale.set(1.5, 1.5, 1.5);
     nozzle.position.set(nx - x, 0, nz);
     group.add(nozzle);
